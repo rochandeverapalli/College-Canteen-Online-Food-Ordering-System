@@ -1,0 +1,13 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /food-images/{allPaths=**} {
+      // Anyone can read food images
+      allow read: if true;
+      // Only authenticated admins can upload images (< 5MB, image/*)
+      allow write: if request.auth != null &&
+                     request.resource.size < 5 * 1024 * 1024 &&
+                     request.resource.contentType.matches('image/.*');
+    }
+  }
+}

@@ -1,0 +1,140 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == '1808benny@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
+    }
+
+    function isValidUser(data) {
+      return data.uid is string &&
+             data.name is string && data.name.size() <= 120 &&
+             data.email is string && data.email.size() <= 120 &&
+             data.role in ['student', 'admin'];
+    }
+
+    function isValidCategory(data) {
+      return data.name is string && data.name.size() <= 80 &&
+             data.active is bool;
+    }
+
+    function isValidFoodItem(data) {
+      return data.name is string && data.name.size() <= 120 &&
+             data.price is number && data.price >= 0 &&
+             data.categoryId is string &&
+             data.available is bool;
+    }
+
+    function isValidOrder(data) {
+      return data.orderId is string &&
+             data.tokenNumber is string && data.tokenNumber.size() <= 20 &&
+             data.userId is string &&
+             data.items is list && data.items.size() > 0 && data.items.size() <= 50 &&
+             data.totalAmount is number && data.totalAmount >= 0 &&
+             data.paymentStatus in ['pending', 'paid', 'failed', 'refunded'] &&
+             data.orderStatus in ['pending', 'accepted', 'preparing', 'ready', 'completed', 'cancelled', 'rejected'];
+    }
+
+    function isValidPayment(data) {
+      return data.paymentId is string &&
+             data.orderId is string &&
+             data.userId is string &&
+             data.amount is number &&
+             data.status in ['pending', 'paid', 'failed', 'refunded'];
+    }
+
+    function isValidSetting(data) {
+      return data.acceptingOrders is bool;
+    }
+
+    // Users Collection
+    match /users/{userId} {
+      allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isSignedIn() && request.auth.uid == userId && isValidUser(incoming()) && (incoming().role == 'student' || isAdmin());
+      allow update: if isSignedIn() && (request.auth.uid == userId || isAdmin()) && isValidUser(incoming()) && (isAdmin() || incoming().role == existing().role);
+      allow delete: if isAdmin();
+    }
+
+    // Categories Collection
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow create: if isAdmin() && isValidCategory(incoming());
+      allow update: if isAdmin() && isValidCategory(incoming());
+      allow delete: if isAdmin();
+    }
+
+    // Food Items Collection
+    match /foodItems/{foodId} {
+      allow read: if true;
+      allow create: if isAdmin() && isValidFoodItem(incoming());
+      allow update: if isAdmin() && isValidFoodItem(incoming());
+      allow delete: if isAdmin();
+    }
+
+    // Orders Collection
+    match /orders/{orderId} {
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && request.auth.uid == incoming().userId && isValidOrder(incoming());
+      allow update: if isSignedIn() && (
+        isAdmin() ||
+        (
+          request.auth.uid == existing().userId &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['orderStatus', 'updatedAt']) &&
+          incoming().orderStatus == 'cancelled' &&
+          existing().orderStatus == 'pending'
+        )
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Payments Collection
+    match /payments/{paymentId} {
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && request.auth.uid == incoming().userId && isValidPayment(incoming());
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Canteen Settings Collection
+    match /canteenSettings/{settingId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && isValidSetting(incoming());
+      allow delete: if isAdmin();
+    }
+
+    // Admins Collection
+    match /admins/{adminId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+  }
+}

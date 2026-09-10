@@ -1,0 +1,141 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Student or Admin user profile",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 120 },
+        "rollNumber": { "type": "string", "maxLength": 50 },
+        "email": { "type": "string", "maxLength": 120 },
+        "role": { "type": "string", "enum": ["student", "admin"] },
+        "phone": { "type": "string", "maxLength": 20 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["uid", "name", "email", "role"]
+    },
+    "Category": {
+      "title": "Category",
+      "description": "Food menu category",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "maxLength": 80 },
+        "description": { "type": "string", "maxLength": 300 },
+        "image": { "type": "string", "maxLength": 1000 },
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["name", "active"]
+    },
+    "FoodItem": {
+      "title": "FoodItem",
+      "description": "Food item in canteen menu",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "maxLength": 120 },
+        "description": { "type": "string", "maxLength": 500 },
+        "price": { "type": "number" },
+        "categoryId": { "type": "string", "maxLength": 128 },
+        "imageUrl": { "type": "string", "maxLength": 1500 },
+        "available": { "type": "boolean" },
+        "isVeg": { "type": "boolean" },
+        "preparationTime": { "type": "number" },
+        "rating": { "type": "number" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["name", "price", "categoryId", "available"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Student canteen order",
+      "type": "object",
+      "properties": {
+        "orderId": { "type": "string", "maxLength": 128 },
+        "tokenNumber": { "type": "string", "maxLength": 20 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "customerName": { "type": "string", "maxLength": 120 },
+        "rollNumber": { "type": "string", "maxLength": 50 },
+        "items": { "type": "array" },
+        "subtotal": { "type": "number" },
+        "tax": { "type": "number" },
+        "totalAmount": { "type": "number" },
+        "paymentStatus": { "type": "string", "enum": ["pending", "paid", "failed", "refunded"] },
+        "paymentId": { "type": "string", "maxLength": 128 },
+        "orderStatus": { "type": "string", "enum": ["pending", "accepted", "preparing", "ready", "completed", "cancelled", "rejected"] },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["orderId", "tokenNumber", "userId", "customerName", "items", "totalAmount", "paymentStatus", "orderStatus"]
+    },
+    "Payment": {
+      "title": "Payment",
+      "description": "Payment transaction record",
+      "type": "object",
+      "properties": {
+        "paymentId": { "type": "string", "maxLength": 128 },
+        "orderId": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "paid", "failed", "refunded"] },
+        "provider": { "type": "string", "maxLength": 50 },
+        "transactionId": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["paymentId", "orderId", "userId", "amount", "status"]
+    },
+    "CanteenSetting": {
+      "title": "CanteenSetting",
+      "description": "Canteen operation settings such as accepting orders toggle",
+      "type": "object",
+      "properties": {
+        "acceptingOrders": { "type": "boolean" },
+        "announcement": { "type": "string", "maxLength": 300 },
+        "maxOrdersLimit": { "type": "number" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["acceptingOrders"]
+    },
+    "Admin": {
+      "title": "Admin",
+      "description": "Admin access list",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "maxLength": 120 },
+        "addedAt": { "type": "string" }
+      },
+      "required": ["email"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles for students and canteen staff"
+    },
+    "/categories/{categoryId}": {
+      "schema": "Category",
+      "description": "Menu categories"
+    },
+    "/foodItems/{foodId}": {
+      "schema": "FoodItem",
+      "description": "Available and sold out food items"
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Customer food orders with tokens and status"
+    },
+    "/payments/{paymentId}": {
+      "schema": "Payment",
+      "description": "Payment records for online and UPI transactions"
+    },
+    "/canteenSettings/{settingId}": {
+      "schema": "CanteenSetting",
+      "description": "Global canteen settings"
+    },
+    "/admins/{adminId}": {
+      "schema": "Admin",
+      "description": "Authorized admin users lookup"
+    }
+  }
+}

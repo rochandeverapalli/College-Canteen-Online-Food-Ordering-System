@@ -1,0 +1,6 @@
+{
+  "name": "College Canteen Online Food Ordering System",
+  "description": "Real-time college canteen ordering system with student menu, instant token generation, live order status tracking, online payments, and staff order management.",
+  "requestFramePermissions": ["notifications"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
