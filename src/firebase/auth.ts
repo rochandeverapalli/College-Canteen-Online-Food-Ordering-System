@@ -120,7 +120,8 @@ export async function updateUserProfile(
 
 export async function claimAdminPrivilege(uid: string, passkey: string): Promise<boolean> {
   // Safe administrative setup mechanism for faculty/evaluator demo
-  if (passkey === 'canteen@admin2026' || passkey === 'faculty123') {
+  const validKeys = ['CANTEEN_STAFF_2025', 'canteen@admin2026', 'faculty123', 'admin2025'];
+  if (validKeys.includes(passkey.trim())) {
     try {
       await updateDoc(doc(db, 'users', uid), { role: 'admin' });
       await setDoc(doc(db, 'admins', uid), {
