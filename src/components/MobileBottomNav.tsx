@@ -1,13 +1,11 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Utensils, ShoppingBag, ClipboardList, User } from 'lucide-react';
+import { Home, Utensils, ShoppingBag, ClipboardList, ShieldCheck } from 'lucide-react';
 import { useCart } from '../context/CartContext';
-import { useAuth } from '../context/AuthContext';
 
 export const MobileBottomNav: React.FC = () => {
   const location = useLocation();
   const { itemCount } = useCart();
-  const { currentUser } = useAuth();
 
   const isActive = (path: string) => location.pathname === path;
 
@@ -17,12 +15,12 @@ export const MobileBottomNav: React.FC = () => {
   }
 
   return (
-    <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-stone-200 pb-safe">
+    <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-[#0e0a24]/95 backdrop-blur-xl border-t border-purple-500/20 pb-safe shadow-[0_-4px_20px_rgba(0,0,0,0.5)]">
       <div className="grid grid-cols-5 h-16">
         <Link
           to="/"
           className={`flex flex-col items-center justify-center gap-1 transition-colors ${
-            isActive('/') ? 'text-amber-600 font-semibold' : 'text-stone-500'
+            isActive('/') ? 'text-teal-400 font-semibold' : 'text-purple-300/70 hover:text-purple-200'
           }`}
         >
           <Home className="w-5 h-5" />
@@ -32,7 +30,7 @@ export const MobileBottomNav: React.FC = () => {
         <Link
           to="/menu"
           className={`flex flex-col items-center justify-center gap-1 transition-colors ${
-            isActive('/menu') ? 'text-amber-600 font-semibold' : 'text-stone-500'
+            isActive('/menu') ? 'text-teal-400 font-semibold' : 'text-purple-300/70 hover:text-purple-200'
           }`}
         >
           <Utensils className="w-5 h-5" />
@@ -42,13 +40,13 @@ export const MobileBottomNav: React.FC = () => {
         <Link
           to="/cart"
           className={`relative flex flex-col items-center justify-center gap-1 transition-colors ${
-            isActive('/cart') ? 'text-amber-600 font-semibold' : 'text-stone-500'
+            isActive('/cart') ? 'text-teal-400 font-semibold' : 'text-purple-300/70 hover:text-purple-200'
           }`}
         >
           <div className="relative">
             <ShoppingBag className="w-5 h-5" />
             {itemCount > 0 && (
-              <span className="absolute -top-1.5 -right-2 bg-amber-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center ring-2 ring-white">
+              <span className="absolute -top-1.5 -right-2.5 bg-gradient-to-r from-purple-500 to-teal-400 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center ring-2 ring-[#0e0a24]">
                 {itemCount}
               </span>
             )}
@@ -57,9 +55,9 @@ export const MobileBottomNav: React.FC = () => {
         </Link>
 
         <Link
-          to={currentUser ? '/orders' : '/login'}
+          to="/orders"
           className={`flex flex-col items-center justify-center gap-1 transition-colors ${
-            isActive('/orders') ? 'text-amber-600 font-semibold' : 'text-stone-500'
+            isActive('/orders') ? 'text-teal-400 font-semibold' : 'text-purple-300/70 hover:text-purple-200'
           }`}
         >
           <ClipboardList className="w-5 h-5" />
@@ -67,13 +65,13 @@ export const MobileBottomNav: React.FC = () => {
         </Link>
 
         <Link
-          to={currentUser ? '/profile' : '/login'}
+          to="/admin/orders"
           className={`flex flex-col items-center justify-center gap-1 transition-colors ${
-            isActive('/profile') || isActive('/login') ? 'text-amber-600 font-semibold' : 'text-stone-500'
+            isActive('/admin/orders') ? 'text-teal-400 font-semibold' : 'text-purple-300/70 hover:text-purple-200'
           }`}
         >
-          <User className="w-5 h-5" />
-          <span className="text-[10px]">Profile</span>
+          <ShieldCheck className="w-5 h-5" />
+          <span className="text-[10px]">Staff</span>
         </Link>
       </div>
     </div>

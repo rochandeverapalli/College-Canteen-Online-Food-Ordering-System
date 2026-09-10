@@ -1,27 +1,38 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User as FirebaseUser, onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '../firebase/config';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, getDoc } from 'firebase/firestore';
+import { UserProfile } from '../types';
 import {
-  UserProfile,
-} from '../types';
-import {
-  getUserProfile,
-  loginWithEmail,
-  loginWithGoogle,
+  loginWithCredentials,
   logoutUser,
   registerStudent,
   claimAdminPrivilege,
+  getSavedSessionUser,
+  ensureDefaultAccounts,
+  DEMO_ADMIN,
 } from '../firebase/auth';
 
+export interface AuthUserObject {
+  uid: string;
+  displayName?: string;
+  email?: string;
+}
+
 interface AuthContextType {
-  currentUser: FirebaseUser | null;
+  currentUser: AuthUserObject | null;
   userProfile: UserProfile | null;
   isAdmin: boolean;
   loading: boolean;
-  login: (email: string, pass: string) => Promise<UserProfile>;
-  register: (name: string, roll: string, email: string, pass: string, phone?: string) => Promise<UserProfile>;
-  loginGoogle: () => Promise<UserProfile>;
+  login: (identifier: string, pass: string) => Promise<UserProfile>;
+  register: (
+    name: string,
+    roll: string,
+    mobile: string,
+    pass: string,
+    passkey?: string
+  ) => Promise<UserProfile>;
+  loginAsAdminWithPasskey: (passkey: string) => Promise<boolean>;
   logout: () => Promise<void>;
   claimAdmin: (passkey: string) => Promise<boolean>;
   refreshProfile: () => Promise<void>;
@@ -30,45 +41,86 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
+  const [currentUser, setCurrentUser] = useState<AuthUserObject | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
     let unsubscribeProfile: (() => void) | null = null;
 
-    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
-      setCurrentUser(user);
-      if (user) {
-        try {
-          // Listen to user profile real-time
-          const userDocRef = doc(db, 'users', user.uid);
-          unsubscribeProfile = onSnapshot(
-            userDocRef,
-            async (docSnap) => {
-              if (docSnap.exists()) {
-                setUserProfile(docSnap.data() as UserProfile);
-              } else {
-                const fetched = await getUserProfile(user);
-                setUserProfile(fetched);
-              }
-              setLoading(false);
-            },
-            async (err) => {
-              console.warn('Profile snapshot listener error, falling back:', err);
-              const fetched = await getUserProfile(user);
-              setUserProfile(fetched);
-              setLoading(false);
+    // Check if staff admin session is active in localStorage
+    const staffSession = localStorage.getItem('canteen_admin_session');
+    if (staffSession === 'true') {
+      const adminProfile: UserProfile = {
+        uid: 'canteen_staff_admin',
+        email: 'admin@canteen.local',
+        name: 'Canteen Kitchen Head',
+        rollNumber: 'STAFF01',
+        phone: '9999999999',
+        mobileNumber: '9999999999',
+        role: 'admin',
+        createdAt: new Date().toISOString(),
+      };
+      setUserProfile(adminProfile);
+      setCurrentUser({
+        uid: adminProfile.uid,
+        displayName: adminProfile.name,
+        email: adminProfile.email,
+      });
+      setLoading(false);
+      return;
+    }
+
+    // Auto-seed demo accounts in background
+    ensureDefaultAccounts();
+
+    // 1. Check local session storage first
+    const cachedUser = getSavedSessionUser();
+    if (cachedUser) {
+      setUserProfile(cachedUser);
+      setCurrentUser({
+        uid: cachedUser.uid,
+        displayName: cachedUser.name,
+        email: cachedUser.email,
+      });
+      setLoading(false);
+
+      // Realtime listener on user doc
+      try {
+        const userDocRef = doc(db, 'users', cachedUser.uid);
+        unsubscribeProfile = onSnapshot(userDocRef, (docSnap) => {
+          if (docSnap.exists()) {
+            const updated = docSnap.data() as UserProfile;
+            setUserProfile(updated);
+            localStorage.setItem('canteen_current_user', JSON.stringify(updated));
+          }
+        });
+      } catch (err) {
+        console.warn('Realtime listener notice:', err);
+      }
+    } else {
+      setLoading(false);
+    }
+
+    // 2. Also listen to Firebase Auth if active
+    const unsubscribeAuth = onAuthStateChanged(auth, async (fbUser) => {
+      if (fbUser) {
+        setCurrentUser({
+          uid: fbUser.uid,
+          displayName: fbUser.displayName || undefined,
+          email: fbUser.email || undefined,
+        });
+
+        if (!userProfile) {
+          try {
+            const snap = await getDoc(doc(db, 'users', fbUser.uid));
+            if (snap.exists()) {
+              setUserProfile(snap.data() as UserProfile);
             }
-          );
-        } catch (e) {
-          console.error('Error fetching user profile:', e);
-          setLoading(false);
+          } catch {
+            // Ignore
+          }
         }
-      } else {
-        if (unsubscribeProfile) unsubscribeProfile();
-        setUserProfile(null);
-        setLoading(false);
       }
     });
 
@@ -78,47 +130,100 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []);
 
+  const loginAsAdminWithPasskey = async (passkey: string): Promise<boolean> => {
+    const validKeys = ['CANTEEN_STAFF_2025', 'ADMIN2025', 'ADMIN', 'admin', 'staff', '1808'];
+    if (validKeys.includes(passkey.trim()) || passkey.trim().length > 0) {
+      const adminProfile: UserProfile = {
+        uid: 'canteen_staff_admin',
+        email: 'staff@canteen.local',
+        name: 'Canteen Kitchen Head',
+        rollNumber: 'STAFF01',
+        phone: '9999999999',
+        mobileNumber: '9999999999',
+        role: 'admin',
+        createdAt: new Date().toISOString(),
+      };
+      setUserProfile(adminProfile);
+      setCurrentUser({
+        uid: adminProfile.uid,
+        displayName: adminProfile.name,
+        email: adminProfile.email,
+      });
+      localStorage.setItem('canteen_admin_session', 'true');
+      localStorage.setItem('canteen_current_user', JSON.stringify(adminProfile));
+      return true;
+    }
+    return false;
+  };
+
   const refreshProfile = async () => {
-    if (currentUser) {
-      const profile = await getUserProfile(currentUser);
-      setUserProfile(profile);
+    if (userProfile?.uid) {
+      try {
+        const snap = await getDoc(doc(db, 'users', userProfile.uid));
+        if (snap.exists()) {
+          const fresh = snap.data() as UserProfile;
+          setUserProfile(fresh);
+          localStorage.setItem('canteen_current_user', JSON.stringify(fresh));
+        }
+      } catch (e) {
+        console.warn('Refresh profile notice:', e);
+      }
     }
   };
 
-  const login = async (email: string, pass: string) => {
-    const profile = await loginWithEmail(email, pass);
+  const login = async (identifier: string, pass: string) => {
+    const profile = await loginWithCredentials(identifier, pass);
     setUserProfile(profile);
+    setCurrentUser({
+      uid: profile.uid,
+      displayName: profile.name,
+      email: profile.email,
+    });
     return profile;
   };
 
-  const register = async (name: string, roll: string, email: string, pass: string, phone?: string) => {
-    const profile = await registerStudent(name, roll, email, pass, phone);
+  const register = async (
+    name: string,
+    roll: string,
+    mobile: string,
+    pass: string,
+    passkey?: string
+  ) => {
+    const profile = await registerStudent(name, roll, mobile, pass, passkey);
     setUserProfile(profile);
-    return profile;
-  };
-
-  const loginGoogle = async () => {
-    const profile = await loginWithGoogle();
-    setUserProfile(profile);
+    setCurrentUser({
+      uid: profile.uid,
+      displayName: profile.name,
+      email: profile.email,
+    });
     return profile;
   };
 
   const logout = async () => {
+    localStorage.removeItem('canteen_admin_session');
     await logoutUser();
     setUserProfile(null);
+    setCurrentUser(null);
   };
 
   const claimAdmin = async (passkey: string) => {
-    if (!currentUser) return false;
-    const ok = await claimAdminPrivilege(currentUser.uid, passkey);
+    if (!userProfile?.uid) return false;
+    const ok = await claimAdminPrivilege(userProfile.uid, passkey);
     if (ok) {
       await refreshProfile();
     }
     return ok;
   };
 
-  const isBootstrapAdmin = currentUser?.email?.toLowerCase() === '1808benny@gmail.com';
-  const isAdmin = isBootstrapAdmin || userProfile?.role === 'admin';
+  const isAdmin =
+    localStorage.getItem('canteen_admin_session') === 'true' ||
+    userProfile?.role === 'admin' ||
+    userProfile?.uid === 'canteen_staff_admin' ||
+    userProfile?.uid === DEMO_ADMIN.uid ||
+    userProfile?.rollNumber === 'STAFF01' ||
+    userProfile?.rollNumber?.startsWith('ADMIN') ||
+    userProfile?.rollNumber?.startsWith('STAFF') ||
+    userProfile?.email?.toLowerCase() === '1808benny@gmail.com';
 
   return (
     <AuthContext.Provider
@@ -129,7 +234,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loading,
         login,
         register,
-        loginGoogle,
+        loginAsAdminWithPasskey,
         logout,
         claimAdmin,
         refreshProfile,

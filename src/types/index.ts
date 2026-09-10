@@ -3,10 +3,12 @@ export type UserRole = 'student' | 'admin';
 export interface UserProfile {
   uid: string;
   name: string;
-  rollNumber?: string;
-  email: string;
+  rollNumber: string;
+  phone: string;
+  mobileNumber?: string;
+  email?: string;
+  password?: string;
   role: UserRole;
-  phone?: string;
   createdAt: string;
 }
 
@@ -69,15 +71,20 @@ export interface OrderItem {
 export interface Order {
   id: string;
   orderId: string;
-  tokenNumber: string;
+  orderNumber?: number; // Sequential integer (1, 2, 3...)
+  tokenNumber: string; // Token identifier ("1", "2", "3" or "ORD-1")
   userId: string;
   customerName: string;
+  customerPhone?: string; // Mobile number
+  phone?: string;
   rollNumber?: string;
+  notes?: string;
   items: OrderItem[];
   subtotal: number;
   tax: number;
   totalAmount: number;
   paymentStatus: PaymentStatus;
+  paymentMethod?: string;
   paymentId: string;
   orderStatus: OrderStatus;
   createdAt: string;

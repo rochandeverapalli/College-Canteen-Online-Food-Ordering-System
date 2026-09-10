@@ -49,8 +49,8 @@ export const AdminAnalytics: React.FC = () => {
   // Calculations
   const totalRevenue = useMemo(() => {
     return filteredOrders
-      .filter((o) => o.paymentStatus === 'paid' && o.orderStatus !== 'cancelled')
-      .reduce((sum, o) => sum + o.totalAmount, 0);
+      .filter((o) => o.orderStatus !== 'rejected' && o.orderStatus !== 'cancelled')
+      .reduce((sum, o) => sum + (o.totalAmount || 0), 0);
   }, [filteredOrders]);
 
   const completedOrdersCount = useMemo(() => {
@@ -106,21 +106,23 @@ export const AdminAnalytics: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white rounded-3xl border border-stone-200 p-6 shadow-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 glass-card rounded-3xl border border-purple-500/20 p-6 shadow-xl">
         <div>
-          <h1 className="text-2xl font-black text-stone-900 tracking-tight">
+          <h1 className="text-2xl font-black text-white tracking-tight">
             Canteen Analytics & Financials
           </h1>
-          <p className="text-xs sm:text-sm text-stone-500">
-            Real-time insights into revenue, popular dishes, and peak campus rush hours
+          <p className="text-xs sm:text-sm text-purple-300/80 mt-1">
+            Real-time insights into canteen income, top ordered meals, and rush hours
           </p>
         </div>
 
-        <div className="flex items-center gap-1.5 bg-stone-100 p-1 rounded-2xl">
+        <div className="flex items-center gap-1.5 bg-purple-950/60 border border-purple-500/30 p-1 rounded-2xl">
           <button
             onClick={() => setDateRange('today')}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-              dateRange === 'today' ? 'bg-white text-stone-900 shadow-2xs' : 'text-stone-600 hover:text-stone-900'
+              dateRange === 'today'
+                ? 'bg-gradient-to-r from-purple-600 to-teal-400 text-white shadow-md'
+                : 'text-purple-300 hover:text-white'
             }`}
           >
             Today
@@ -128,7 +130,9 @@ export const AdminAnalytics: React.FC = () => {
           <button
             onClick={() => setDateRange('week')}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-              dateRange === 'week' ? 'bg-white text-stone-900 shadow-2xs' : 'text-stone-600 hover:text-stone-900'
+              dateRange === 'week'
+                ? 'bg-gradient-to-r from-purple-600 to-teal-400 text-white shadow-md'
+                : 'text-purple-300 hover:text-white'
             }`}
           >
             Last 7 Days
@@ -136,7 +140,9 @@ export const AdminAnalytics: React.FC = () => {
           <button
             onClick={() => setDateRange('all')}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-              dateRange === 'all' ? 'bg-white text-stone-900 shadow-2xs' : 'text-stone-600 hover:text-stone-900'
+              dateRange === 'all'
+                ? 'bg-gradient-to-r from-purple-600 to-teal-400 text-white shadow-md'
+                : 'text-purple-300 hover:text-white'
             }`}
           >
             All Time
@@ -146,56 +152,58 @@ export const AdminAnalytics: React.FC = () => {
 
       {/* Primary KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-3xl border border-stone-200 p-6 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between text-stone-500">
+        <div className="glass-card rounded-3xl border border-purple-500/20 p-6 shadow-lg space-y-1">
+          <div className="flex items-center justify-between text-purple-300">
             <span className="text-xs font-bold uppercase tracking-wider">Total Sales</span>
-            <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-xl bg-teal-500/20 text-teal-300 border border-teal-500/30 flex items-center justify-center">
               <DollarSign className="w-4 h-4" />
             </div>
           </div>
-          <span className="text-3xl font-black text-stone-950 block">₹{totalRevenue}</span>
-          <span className="text-[11px] text-emerald-600 font-semibold block">
-            100% verified online payment
+          <span className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-300 to-white block">
+            ₹{totalRevenue}
+          </span>
+          <span className="text-[11px] text-teal-300 font-semibold block">
+            Online & counter payments
           </span>
         </div>
 
-        <div className="bg-white rounded-3xl border border-stone-200 p-6 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between text-stone-500">
+        <div className="glass-card rounded-3xl border border-purple-500/20 p-6 shadow-lg space-y-1">
+          <div className="flex items-center justify-between text-purple-300">
             <span className="text-xs font-bold uppercase tracking-wider">Orders Handled</span>
-            <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-500/30 flex items-center justify-center">
               <ShoppingBag className="w-4 h-4" />
             </div>
           </div>
-          <span className="text-3xl font-black text-stone-950 block">
+          <span className="text-3xl font-black text-white block">
             {filteredOrders.length}
           </span>
-          <span className="text-[11px] text-stone-400 font-medium block">
+          <span className="text-[11px] text-purple-300/70 font-medium block">
             {completedOrdersCount} successfully collected
           </span>
         </div>
 
-        <div className="bg-white rounded-3xl border border-stone-200 p-6 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between text-stone-500">
+        <div className="glass-card rounded-3xl border border-purple-500/20 p-6 shadow-lg space-y-1">
+          <div className="flex items-center justify-between text-purple-300">
             <span className="text-xs font-bold uppercase tracking-wider">Average Order</span>
-            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-xl bg-teal-500/20 text-teal-300 border border-teal-500/30 flex items-center justify-center">
               <TrendingUp className="w-4 h-4" />
             </div>
           </div>
-          <span className="text-3xl font-black text-stone-950 block">₹{avgOrderValue}</span>
-          <span className="text-[11px] text-stone-400 font-medium block">
-            Per student transaction
+          <span className="text-3xl font-black text-white block">₹{avgOrderValue}</span>
+          <span className="text-[11px] text-purple-300/70 font-medium block">
+            Per customer transaction
           </span>
         </div>
 
-        <div className="bg-white rounded-3xl border border-stone-200 p-6 shadow-2xs space-y-1">
-          <div className="flex items-center justify-between text-stone-500">
+        <div className="glass-card rounded-3xl border border-purple-500/20 p-6 shadow-lg space-y-1">
+          <div className="flex items-center justify-between text-purple-300">
             <span className="text-xs font-bold uppercase tracking-wider">Avg Prep Speed</span>
-            <div className="w-8 h-8 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 flex items-center justify-center">
               <Clock className="w-4 h-4" />
             </div>
           </div>
-          <span className="text-3xl font-black text-stone-950 block">~12m</span>
-          <span className="text-[11px] text-stone-400 font-medium block">
+          <span className="text-3xl font-black text-white block">~10m</span>
+          <span className="text-[11px] text-purple-300/70 font-medium block">
             Kitchen turnaround time
           </span>
         </div>
@@ -204,39 +212,39 @@ export const AdminAnalytics: React.FC = () => {
       {/* Analytics Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Peak Rush Hours Visual Chart */}
-        <div className="lg:col-span-7 bg-white rounded-3xl border border-stone-200 p-6 shadow-sm space-y-4">
+        <div className="lg:col-span-7 glass-card rounded-3xl border border-purple-500/20 p-6 shadow-xl space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-base font-bold text-stone-900">
+              <h3 className="text-base font-bold text-white">
                 Hourly Student Order Traffic
               </h3>
-              <p className="text-xs text-stone-400">
+              <p className="text-xs text-purple-300/70">
                 Identify lunch rush vs snack break peaks across the canteen day
               </p>
             </div>
-            <span className="text-[11px] font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full">
-              Counter Traffic
+            <span className="text-[11px] font-bold text-teal-300 bg-teal-950/50 border border-teal-500/30 px-2.5 py-1 rounded-full">
+              Kitchen Traffic
             </span>
           </div>
 
           {/* Bar chart visualization */}
           <div className="pt-6 pb-2">
-            <div className="flex items-end justify-between gap-1.5 sm:gap-2 h-48 border-b border-stone-200 pb-2">
+            <div className="flex items-end justify-between gap-1.5 sm:gap-2 h-48 border-b border-purple-500/20 pb-2">
               {hourlyData.map((item, idx) => (
                 <div key={idx} className="flex-1 flex flex-col items-center gap-1 group relative">
                   {/* Tooltip on hover */}
-                  <div className="absolute -top-7 opacity-0 group-hover:opacity-100 transition-opacity bg-stone-900 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow whitespace-nowrap pointer-events-none z-10">
+                  <div className="absolute -top-7 opacity-0 group-hover:opacity-100 transition-opacity bg-black text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow whitespace-nowrap pointer-events-none z-10 border border-purple-500/30">
                     {item.count} orders
                   </div>
-                  <div className="w-full bg-stone-100 rounded-t-lg h-full flex items-end">
+                  <div className="w-full bg-purple-950/40 rounded-t-lg h-full flex items-end">
                     <div
-                      className="w-full bg-amber-500 hover:bg-amber-600 rounded-t-lg transition-all duration-300"
+                      className="w-full bg-gradient-to-t from-purple-600 to-teal-400 hover:from-purple-500 hover:to-teal-300 rounded-t-lg transition-all duration-300"
                       style={{
-                        height: `${Math.max(item.percent, item.count > 0 ? 8 : 2)}%`,
+                        height: `${Math.max(item.percent, item.count > 0 ? 10 : 2)}%`,
                       }}
                     />
                   </div>
-                  <span className="text-[10px] text-stone-500 font-mono rotate-45 sm:rotate-0 mt-1 whitespace-nowrap">
+                  <span className="text-[10px] text-purple-300 font-mono rotate-45 sm:rotate-0 mt-1 whitespace-nowrap">
                     {item.hour.replace(' ', '')}
                   </span>
                 </div>
@@ -246,16 +254,16 @@ export const AdminAnalytics: React.FC = () => {
         </div>
 
         {/* Top 5 Most Ordered Items */}
-        <div className="lg:col-span-5 bg-white rounded-3xl border border-stone-200 p-6 shadow-sm space-y-4">
+        <div className="lg:col-span-5 glass-card rounded-3xl border border-purple-500/20 p-6 shadow-xl space-y-4">
           <div className="flex items-center gap-2">
-            <Award className="w-5 h-5 text-amber-500" />
-            <h3 className="text-base font-bold text-stone-900">
+            <Award className="w-5 h-5 text-teal-400" />
+            <h3 className="text-base font-bold text-white">
               Top 5 Best-Selling Dishes
             </h3>
           </div>
 
           {topItems.length === 0 ? (
-            <div className="text-center py-10 text-stone-400 text-xs">
+            <div className="text-center py-10 text-purple-300/60 text-xs">
               No dish order volume data available for this range yet.
             </div>
           ) : (
@@ -268,18 +276,18 @@ export const AdminAnalytics: React.FC = () => {
                   <div key={idx} className="space-y-1">
                     <div className="flex items-center justify-between text-xs">
                       <div className="flex items-center gap-2">
-                        <span className="w-5 h-5 rounded-full bg-amber-100 text-amber-900 font-bold text-[10px] flex items-center justify-center">
+                        <span className="w-5 h-5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30 font-bold text-[10px] flex items-center justify-center">
                           {idx + 1}
                         </span>
-                        <span className="font-bold text-stone-900">{item.name}</span>
+                        <span className="font-bold text-white">{item.name}</span>
                       </div>
-                      <span className="font-black text-stone-800">
+                      <span className="font-black text-teal-300">
                         {item.count} ordered (₹{item.revenue})
                       </span>
                     </div>
-                    <div className="w-full h-2 bg-stone-100 rounded-full overflow-hidden">
+                    <div className="w-full h-2 bg-purple-950/60 rounded-full overflow-hidden border border-purple-500/20">
                       <div
-                        className="h-full bg-amber-500 rounded-full"
+                        className="h-full bg-gradient-to-r from-purple-600 to-teal-400 rounded-full"
                         style={{ width: `${ratio}%` }}
                       />
                     </div>

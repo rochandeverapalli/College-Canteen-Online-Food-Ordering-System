@@ -14,6 +14,8 @@ import {
   AlertCircle,
   Database,
   Sparkles,
+  User,
+  Phone,
 } from 'lucide-react';
 import { Order, CanteenSetting } from '../../types';
 import {
@@ -78,8 +80,8 @@ export const AdminDashboard: React.FC = () => {
   const completedOrders = orders.filter((o) => o.orderStatus === 'completed');
 
   const todayRevenue = todayOrders
-    .filter((o) => o.paymentStatus === 'paid' && o.orderStatus !== 'cancelled')
-    .reduce((sum, o) => sum + o.totalAmount, 0);
+    .filter((o) => o.orderStatus !== 'rejected' && o.orderStatus !== 'cancelled')
+    .reduce((sum, o) => sum + (o.totalAmount || 0), 0);
 
   const activeQueue = orders
     .filter((o) => ['pending', 'accepted', 'preparing', 'ready'].includes(o.orderStatus))
@@ -88,237 +90,232 @@ export const AdminDashboard: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Top Controls Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white rounded-3xl border border-stone-200 p-6 shadow-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 glass-card rounded-3xl border border-purple-500/20 p-6 shadow-xl">
         <div>
-          <h1 className="text-2xl font-black text-stone-900 tracking-tight">
+          <h1 className="text-2xl font-black text-white tracking-tight">
             Kitchen Operations Overview
           </h1>
-          <p className="text-xs sm:text-sm text-stone-500">
+          <p className="text-xs sm:text-sm text-purple-300/80 mt-1">
             Real-time live queue and canteen sales for today ({new Date().toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })})
           </p>
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Quick Toggle: Accepting Online Orders */}
+          {orders.length < 5 && (
+            <button
+              onClick={handleSeed}
+              disabled={seeding}
+              className="px-3.5 py-2 rounded-2xl bg-purple-900/60 hover:bg-purple-800 text-teal-300 border border-purple-500/30 text-xs font-semibold flex items-center gap-1.5 transition"
+            >
+              <Database className="w-3.5 h-3.5" />
+              <span>{seeding ? 'Seeding...' : 'Load 26+ Items'}</span>
+            </button>
+          )}
+
+          {/* Toggle Canteen Open/Close */}
           <button
             onClick={handleToggleAccepting}
             disabled={toggling}
-            className={`flex items-center gap-2.5 px-4 py-2.5 rounded-2xl font-bold text-xs shadow-sm transition ${
+            className={`px-4 py-2.5 rounded-2xl text-xs font-black flex items-center gap-2 transition shadow-md ${
               settings.acceptingOrders
-                ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                : 'bg-rose-600 hover:bg-rose-700 text-white'
+                ? 'bg-teal-400 hover:bg-teal-300 text-slate-950 shadow-teal-400/30'
+                : 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-600/30'
             }`}
           >
-            <Power className="w-4 h-4" />
-            <span>
-              {toggling
-                ? 'Updating...'
-                : settings.acceptingOrders
-                ? 'Accepting Orders: ON'
-                : 'Accepting Orders: PAUSED'}
-            </span>
+            <Power className="w-3.5 h-3.5" />
+            <span>{settings.acceptingOrders ? 'Counter Open (Accepting)' : 'Counter Paused'}</span>
           </button>
         </div>
       </div>
 
-      {/* Metrics Row */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
-        {/* Total Today */}
-        <div className="bg-white rounded-2xl border border-stone-200 p-4 shadow-2xs">
-          <span className="text-xs text-stone-400 font-semibold block">Today's Orders</span>
-          <span className="text-2xl sm:text-3xl font-black text-stone-900 mt-1 block">
-            {todayOrders.length}
+      {/* Metric Cards Grid */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Today Revenue */}
+        <div className="glass-card rounded-3xl border border-purple-500/20 p-5 shadow-lg">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-purple-300 uppercase tracking-wider">
+              Today's Sales
+            </span>
+            <div className="w-8 h-8 rounded-xl bg-teal-500/20 text-teal-300 border border-teal-500/30 flex items-center justify-center">
+              <TrendingUp className="w-4 h-4" />
+            </div>
+          </div>
+          <span className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-teal-300 to-white mt-2 block">
+            ₹{todayRevenue}
           </span>
-          <span className="text-[11px] text-stone-500 mt-0.5 block">Total logged</span>
+          <span className="text-[11px] text-purple-300/70 mt-1 block">
+            {todayOrders.length} orders placed today
+          </span>
         </div>
 
-        {/* Pending */}
-        <div className="bg-white rounded-2xl border border-blue-200 p-4 shadow-2xs">
-          <span className="text-xs text-blue-700 font-semibold flex items-center gap-1">
-            <Clock className="w-3.5 h-3.5" />
-            Pending
-          </span>
-          <span className="text-2xl sm:text-3xl font-black text-blue-900 mt-1 block">
+        {/* Pending Orders */}
+        <div className="glass-card rounded-3xl border border-amber-500/30 bg-amber-950/10 p-5 shadow-lg">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-amber-300 uppercase tracking-wider">
+              Pending Orders
+            </span>
+            <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center justify-center">
+              <Clock className="w-4 h-4" />
+            </div>
+          </div>
+          <span className="text-3xl font-black text-amber-300 mt-2 block">
             {pendingOrders.length}
           </span>
-          <span className="text-[11px] text-blue-600 mt-0.5 block">Awaiting accept</span>
+          <span className="text-[11px] text-amber-200/70 mt-1 block">
+            Needs counter acceptance
+          </span>
         </div>
 
-        {/* Preparing */}
-        <div className="bg-white rounded-2xl border border-amber-200 p-4 shadow-2xs">
-          <span className="text-xs text-amber-700 font-semibold flex items-center gap-1">
-            <ChefHat className="w-3.5 h-3.5" />
-            Cooking
-          </span>
-          <span className="text-2xl sm:text-3xl font-black text-amber-900 mt-1 block">
+        {/* In Kitchen Preparing */}
+        <div className="glass-card rounded-3xl border border-purple-500/30 bg-purple-950/10 p-5 shadow-lg">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-purple-300 uppercase tracking-wider">
+              In Kitchen
+            </span>
+            <div className="w-8 h-8 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-500/30 flex items-center justify-center">
+              <ChefHat className="w-4 h-4" />
+            </div>
+          </div>
+          <span className="text-3xl font-black text-purple-200 mt-2 block">
             {preparingOrders.length}
           </span>
-          <span className="text-[11px] text-amber-600 mt-0.5 block">In kitchen</span>
+          <span className="text-[11px] text-purple-300/70 mt-1 block">
+            Cooking right now
+          </span>
         </div>
 
         {/* Ready for Pickup */}
-        <div className="bg-white rounded-2xl border border-emerald-200 p-4 shadow-2xs">
-          <span className="text-xs text-emerald-700 font-semibold flex items-center gap-1">
-            <Flame className="w-3.5 h-3.5" />
-            Ready
-          </span>
-          <span className="text-2xl sm:text-3xl font-black text-emerald-900 mt-1 block">
+        <div className="glass-card rounded-3xl border border-teal-500/30 bg-teal-950/15 p-5 shadow-lg">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-teal-300 uppercase tracking-wider">
+              Ready for Callout
+            </span>
+            <div className="w-8 h-8 rounded-xl bg-teal-500/20 text-teal-300 border border-teal-500/30 flex items-center justify-center">
+              <Bell className="w-4 h-4" />
+            </div>
+          </div>
+          <span className="text-3xl font-black text-teal-300 mt-2 block">
             {readyOrders.length}
           </span>
-          <span className="text-[11px] text-emerald-600 mt-0.5 block">At counter</span>
-        </div>
-
-        {/* Completed */}
-        <div className="bg-white rounded-2xl border border-stone-200 p-4 shadow-2xs">
-          <span className="text-xs text-stone-500 font-semibold flex items-center gap-1">
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            Completed
+          <span className="text-[11px] text-teal-200/70 mt-1 block">
+            Awaiting student collection
           </span>
-          <span className="text-2xl sm:text-3xl font-black text-stone-800 mt-1 block">
-            {completedOrders.length}
-          </span>
-          <span className="text-[11px] text-stone-500 mt-0.5 block">Handed over</span>
-        </div>
-
-        {/* Total Revenue */}
-        <div className="bg-gradient-to-br from-amber-500 to-amber-600 text-white rounded-2xl p-4 shadow-sm">
-          <span className="text-xs text-amber-100 font-semibold flex items-center gap-1">
-            <TrendingUp className="w-3.5 h-3.5" />
-            Revenue
-          </span>
-          <span className="text-2xl sm:text-3xl font-black mt-1 block">
-            ₹{todayRevenue}
-          </span>
-          <span className="text-[11px] text-amber-100 mt-0.5 block">Collected online</span>
         </div>
       </div>
 
-      {/* Active Orders Queue Preview */}
-      <div className="bg-white rounded-3xl border border-stone-200 p-6 shadow-sm space-y-4">
-        <div className="flex items-center justify-between border-b border-stone-100 pb-3">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full bg-emerald-500 animate-ping" />
-            <h3 className="text-base font-bold text-stone-900">
-              Live Kitchen Counter Queue ({activeQueue.length} Active)
-            </h3>
+      {/* Active Kitchen Queue Section */}
+      <div className="glass-card rounded-3xl border border-purple-500/20 p-6 shadow-xl space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-black text-white">
+              Immediate Kitchen Priority Queue
+            </h2>
+            <p className="text-xs text-purple-300/70">
+              Orders requiring immediate attention, prep, or counter handover
+            </p>
           </div>
           <Link
             to="/admin/orders"
-            className="text-xs font-bold text-amber-600 hover:text-amber-700 flex items-center gap-1"
+            className="text-xs font-bold text-teal-300 hover:text-teal-200 flex items-center gap-1.5"
           >
-            <span>Manage All in Kitchen Queue</span>
+            <span>View All Live Orders</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
 
-        {activeQueue.length === 0 ? (
-          <div className="text-center py-12 text-stone-400">
-            <CheckCircle2 className="w-10 h-10 mx-auto mb-2 text-stone-300 stroke-1" />
-            <p className="text-sm font-semibold">Kitchen queue is clear right now!</p>
-            <p className="text-xs text-stone-400 mt-0.5">
-              New student orders will appear here instantaneously with token numbers.
+        {loading && (
+          <div className="py-12 flex flex-col items-center justify-center space-y-2">
+            <RefreshCw className="w-6 h-6 text-teal-400 animate-spin" />
+            <span className="text-xs text-purple-300">Syncing live orders...</span>
+          </div>
+        )}
+
+        {!loading && activeQueue.length === 0 && (
+          <div className="py-12 text-center border border-dashed border-purple-500/20 rounded-2xl">
+            <CheckCircle2 className="w-10 h-10 text-teal-400/50 mx-auto mb-2" />
+            <h4 className="text-sm font-bold text-white">Kitchen Queue is Clear</h4>
+            <p className="text-xs text-purple-300/70 mt-0.5">
+              All placed meals have been prepared and collected.
             </p>
           </div>
-        ) : (
+        )}
+
+        {!loading && activeQueue.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {activeQueue.map((order) => (
-              <div
-                key={order.orderId}
-                className="bg-stone-50 border border-stone-200 rounded-2xl p-4 space-y-3 flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-mono font-black text-xl text-amber-900 bg-amber-100 px-2.5 py-0.5 rounded-lg">
-                      #{order.tokenNumber}
-                    </span>
-                    <span
-                      className={`text-[11px] font-bold uppercase px-2 py-0.5 rounded-md ${
-                        order.orderStatus === 'ready'
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : order.orderStatus === 'preparing'
-                          ? 'bg-amber-100 text-amber-800'
-                          : 'bg-blue-100 text-blue-800'
-                      }`}
-                    >
-                      {order.orderStatus}
-                    </span>
-                  </div>
+            {activeQueue.map((order) => {
+              const displayNum = order.orderNumber
+                ? `#${order.orderNumber}`
+                : order.tokenNumber
+                ? `#${order.tokenNumber}`
+                : '#1';
 
-                  <p className="text-xs font-bold text-stone-900">
-                    {order.customerName}{' '}
-                    <span className="font-mono text-stone-500 font-normal">
-                      ({order.rollNumber})
-                    </span>
-                  </p>
-
-                  <div className="mt-2 space-y-1 text-xs text-stone-700">
-                    {order.items.map((i, idx) => (
-                      <div key={idx} className="flex justify-between">
-                        <span>{i.quantity}× {i.name}</span>
-                        <span className="font-semibold text-stone-900">₹{i.subtotal}</span>
+              return (
+                <div
+                  key={order.orderId}
+                  className="p-4 rounded-2xl bg-purple-950/40 border border-purple-500/30 flex flex-col justify-between space-y-3"
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-black text-xl text-teal-300 bg-purple-900/60 px-2.5 py-1 rounded-xl border border-teal-400/30">
+                          {displayNum}
+                        </span>
+                        <div>
+                          <div className="flex items-center gap-1">
+                            <User className="w-3 h-3 text-purple-300" />
+                            <span className="text-xs font-bold text-white">
+                              {order.customerName}
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-purple-300/70 font-mono">
+                            {order.customerPhone || order.phone || 'N/A'}
+                          </span>
+                        </div>
                       </div>
-                    ))}
+                      <span
+                        className={`text-[10px] font-black capitalize px-2 py-0.5 rounded-full ${
+                          order.orderStatus === 'ready'
+                            ? 'bg-teal-400 text-[#090816] animate-pulse'
+                            : order.orderStatus === 'preparing'
+                            ? 'bg-purple-500/30 text-purple-200'
+                            : 'bg-amber-500/30 text-amber-200'
+                        }`}
+                      >
+                        {order.orderStatus}
+                      </span>
+                    </div>
+
+                    <div className="text-xs text-purple-200 space-y-1">
+                      {order.items.map((it, idx) => (
+                        <div key={idx} className="flex justify-between">
+                          <span>
+                            <strong className="text-teal-300 mr-1">{it.quantity}×</strong>
+                            {it.name}
+                          </span>
+                          <span className="text-purple-300/80">₹{it.subtotal}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-purple-500/20 flex items-center justify-between">
+                    <span className="text-xs font-black text-white">
+                      ₹{order.totalAmount}
+                    </span>
+                    <Link
+                      to="/admin/orders"
+                      className="text-xs font-bold text-teal-300 hover:text-white flex items-center gap-1"
+                    >
+                      <span>Manage</span>
+                      <ArrowRight className="w-3 h-3" />
+                    </Link>
                   </div>
                 </div>
-
-                {/* 1-Click Status buttons */}
-                <div className="pt-2 border-t border-stone-200 flex items-center gap-2">
-                  {order.orderStatus === 'pending' && (
-                    <button
-                      onClick={() => updateOrderStatus(order.orderId, 'accepted')}
-                      className="flex-1 py-1.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold"
-                    >
-                      Accept Order
-                    </button>
-                  )}
-                  {order.orderStatus === 'accepted' && (
-                    <button
-                      onClick={() => updateOrderStatus(order.orderId, 'preparing')}
-                      className="flex-1 py-1.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold"
-                    >
-                      Start Cooking
-                    </button>
-                  )}
-                  {order.orderStatus === 'preparing' && (
-                    <button
-                      onClick={() => updateOrderStatus(order.orderId, 'ready')}
-                      className="flex-1 py-1.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold"
-                    >
-                      Mark Ready!
-                    </button>
-                  )}
-                  {order.orderStatus === 'ready' && (
-                    <button
-                      onClick={() => updateOrderStatus(order.orderId, 'completed')}
-                      className="flex-1 py-1.5 px-3 rounded-xl bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold"
-                    >
-                      Hand Over
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
-
-      {/* Demo helper if no orders yet */}
-      {orders.length === 0 && !loading && (
-        <div className="bg-amber-50 border border-amber-200 rounded-3xl p-6 text-center space-y-3">
-          <Database className="w-8 h-8 text-amber-600 mx-auto" />
-          <h4 className="text-base font-bold text-stone-900">No Orders in Database</h4>
-          <p className="text-xs text-stone-600 max-w-md mx-auto">
-            Place an order from the student menu to test the real-time live kitchen queue and token tracker.
-          </p>
-          <button
-            onClick={handleSeed}
-            disabled={seeding}
-            className="px-4 py-2 bg-amber-500 text-white text-xs font-bold rounded-xl"
-          >
-            {seeding ? 'Seeding Menu...' : 'Seed Sample Canteen Menu Items'}
-          </button>
-        </div>
-      )}
     </div>
   );
 };

@@ -12,6 +12,7 @@ import {
   orderBy,
   onSnapshot,
   serverTimestamp,
+  runTransaction,
 } from 'firebase/firestore';
 import { db } from './config';
 import {
@@ -22,6 +23,7 @@ import {
   PaymentRecord,
   CanteenSetting,
 } from '../types';
+import { INITIAL_CATEGORIES, INITIAL_FOOD_ITEMS } from '../data/menuData';
 import { handleFirestoreError, OperationType } from './errors';
 
 // Collections
@@ -44,9 +46,15 @@ export function subscribeToCategories(
       snapshot.forEach((docSnap) => {
         list.push({ id: docSnap.id, ...(docSnap.data() as Omit<Category, 'id'>) });
       });
-      onUpdate(list);
+      if (list.length > 0) {
+        onUpdate(list);
+      } else {
+        onUpdate(INITIAL_CATEGORIES);
+      }
     },
     (error) => {
+      console.warn('Firestore categories listener / offline:', error);
+      onUpdate(INITIAL_CATEGORIES);
       if (onError) onError(error);
       handleFirestoreError(error, OperationType.GET, CATEGORIES_COL);
     }
@@ -142,9 +150,15 @@ export function subscribeToFoodItems(
       snapshot.forEach((docSnap) => {
         list.push({ id: docSnap.id, ...(docSnap.data() as Omit<FoodItem, 'id'>) });
       });
-      onUpdate(list);
+      if (list.length > 0) {
+        onUpdate(list);
+      } else {
+        onUpdate(INITIAL_FOOD_ITEMS);
+      }
     },
     (error) => {
+      console.warn('Firestore food items listener / offline:', error);
+      onUpdate(INITIAL_FOOD_ITEMS);
       if (onError) onError(error);
       handleFirestoreError(error, OperationType.GET, FOOD_ITEMS_COL);
     }
@@ -195,43 +209,90 @@ export async function toggleFoodAvailability(
   return updateFoodItem(id, { available });
 }
 
-/* ==================== TOKEN NUMBER GENERATOR ==================== */
+/* ==================== TOKEN & SEQUENTIAL ORDER NUMBER GENERATOR ==================== */
+
+const COUNTERS_COL = 'counters';
+const ORDER_COUNTER_DOC = 'orders';
+
+/**
+ * Generates an atomic sequential integer order number (1, 2, 3...)
+ * clubbed across all customers using a Firestore transaction.
+ */
+export async function getNextOrderNumber(): Promise<number> {
+  const counterRef = doc(db, COUNTERS_COL, ORDER_COUNTER_DOC);
+  try {
+    const nextNum = await runTransaction(db, async (transaction) => {
+      const counterDoc = await transaction.get(counterRef);
+      let current = 0;
+      if (counterDoc.exists()) {
+        const val = counterDoc.data().currentNumber;
+        if (typeof val === 'number') current = val;
+      }
+      const next = current + 1;
+      transaction.set(
+        counterRef,
+        { currentNumber: next, updatedAt: new Date().toISOString() },
+        { merge: true }
+      );
+      return next;
+    });
+    return nextNum;
+  } catch (err) {
+    console.warn('Atomic counter transaction notice, querying existing orders count:', err);
+    try {
+      const ordersSnap = await getDocs(collection(db, ORDERS_COL));
+      const next = ordersSnap.size + 1;
+      setDoc(
+        counterRef,
+        { currentNumber: next, updatedAt: new Date().toISOString() },
+        { merge: true }
+      ).catch(() => {});
+      return next;
+    } catch {
+      return 1;
+    }
+  }
+}
 
 export async function generateNextTokenNumber(): Promise<string> {
-  try {
-    // Look up recent orders created today to generate sequential token like C001, C002...
-    const ordersSnap = await getDocs(collection(db, ORDERS_COL));
-    const count = ordersSnap.size;
-    const tokenNum = (count + 1).toString().padStart(3, '0');
-    return `C${tokenNum}`;
-  } catch (err) {
-    const randomNum = Math.floor(100 + Math.random() * 900);
-    return `C${randomNum}`;
-  }
+  const orderNum = await getNextOrderNumber();
+  return orderNum.toString();
 }
 
 /* ==================== ORDERS ==================== */
 
 export async function createOrder(
-  orderData: Omit<Order, 'id'>,
-  paymentData: Omit<PaymentRecord, 'paymentId'>
+  orderData: Omit<Order, 'id' | 'orderId'> & { orderNumber?: number },
+  paymentData?: Partial<PaymentRecord>
 ): Promise<Order> {
-  const orderId = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-  const paymentId = `PAY-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+  // If orderNumber was not pre-assigned, get next sequential order number
+  const orderNumber = orderData.orderNumber || (await getNextOrderNumber());
+  const tokenNumber = orderNumber.toString(); // "1", "2", "3"...
+  const orderId = `ORD-${Date.now()}-${orderNumber}`;
+  const paymentId = `PAY-${Date.now()}-${orderNumber}`;
 
   const fullOrder: Order = {
     ...orderData,
     id: orderId,
     orderId,
+    orderNumber,
+    tokenNumber,
+    customerPhone: orderData.customerPhone || orderData.phone || '',
+    paymentStatus: orderData.paymentStatus || 'paid',
     paymentId,
+    orderStatus: orderData.orderStatus || 'pending',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
 
   const fullPayment: PaymentRecord = {
-    ...paymentData,
     paymentId,
     orderId,
+    userId: orderData.userId || 'guest',
+    amount: orderData.totalAmount,
+    status: 'paid',
+    provider: paymentData?.provider || 'UPI / Counter Payment',
+    transactionId: paymentData?.transactionId || `TXN${Date.now()}`,
     createdAt: new Date().toISOString(),
   };
 
@@ -242,7 +303,36 @@ export async function createOrder(
     return fullOrder;
   } catch (error) {
     handleFirestoreError(error, OperationType.CREATE, ORDERS_COL);
+    // Return order if non-fatal network error occurred
+    return fullOrder;
   }
+}
+
+export function subscribeToOrdersByPhone(
+  phone: string,
+  onUpdate: (orders: Order[]) => void,
+  onError?: (err: unknown) => void
+) {
+  const cleanPhone = phone.trim().replace(/\D/g, '');
+  return onSnapshot(
+    collection(db, ORDERS_COL),
+    (snapshot) => {
+      const list: Order[] = [];
+      snapshot.forEach((docSnap) => {
+        const d = docSnap.data() as Order;
+        const itemPhone = (d.customerPhone || d.phone || '').replace(/\D/g, '');
+        if (itemPhone && (itemPhone === cleanPhone || itemPhone.endsWith(cleanPhone) || cleanPhone.endsWith(itemPhone))) {
+          list.push({ id: docSnap.id, ...d });
+        }
+      });
+      list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      onUpdate(list);
+    },
+    (error) => {
+      if (onError) onError(error);
+      handleFirestoreError(error, OperationType.LIST, ORDERS_COL);
+    }
+  );
 }
 
 export function subscribeToStudentOrders(
@@ -389,279 +479,27 @@ export async function seedCanteenDemoData(): Promise<{ categoriesCount: number; 
   const categoriesCollection = collection(db, CATEGORIES_COL);
   const existingCats = await getDocs(categoriesCollection);
 
-  const sampleCategories: Omit<Category, 'id'>[] = [
-    {
-      name: 'Breakfast',
-      description: 'Hot, fresh south & north Indian morning specials',
-      image: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?w=600&auto=format&fit=crop&q=80',
-      active: true,
-      createdAt: new Date().toISOString(),
-    },
-    {
-      name: 'Meals & Biryani',
-      description: 'Filling lunch bowls, aromatic biryanis and combo plates',
-      image: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=600&auto=format&fit=crop&q=80',
-      active: true,
-      createdAt: new Date().toISOString(),
-    },
-    {
-      name: 'Fast Food & Burgers',
-      description: 'Crispy burgers, cheesy wraps, sandwiches, and golden fries',
-      image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=600&auto=format&fit=crop&q=80',
-      active: true,
-      createdAt: new Date().toISOString(),
-    },
-    {
-      name: 'Snacks & Street Food',
-      description: 'Quick bites, samosas, cutlets, and crunchy appetizers',
-      image: 'https://images.unsplash.com/photo-1601050690597-df0568f70950?w=600&auto=format&fit=crop&q=80',
-      active: true,
-      createdAt: new Date().toISOString(),
-    },
-    {
-      name: 'Beverages & Chai',
-      description: 'Steaming masala chai, iced coolers, juices, and cold sodas',
-      image: 'https://images.unsplash.com/photo-1544787219-7f47ccb76574?w=600&auto=format&fit=crop&q=80',
-      active: true,
-      createdAt: new Date().toISOString(),
-    },
-    {
-      name: 'Desserts',
-      description: 'Sweet treats, brownies, and ice cream tubs',
-      image: 'https://images.unsplash.com/photo-1551024709-8f23befc6f87?w=600&auto=format&fit=crop&q=80',
-      active: true,
-      createdAt: new Date().toISOString(),
-    },
-  ];
-
-  const catIdMap: Record<string, string> = {};
-
   // Check or create categories
   if (existingCats.empty) {
-    for (const cat of sampleCategories) {
-      const docRef = await addDoc(categoriesCollection, cat);
-      catIdMap[cat.name] = docRef.id;
+    for (const cat of INITIAL_CATEGORIES) {
+      await setDoc(doc(db, CATEGORIES_COL, cat.id), {
+        ...cat,
+        createdAt: new Date().toISOString(),
+      });
     }
-  } else {
-    existingCats.forEach((d) => {
-      const data = d.data() as Category;
-      catIdMap[data.name] = d.id;
-    });
   }
-
-  // Ensure default fallback category IDs
-  const breakfastId = catIdMap['Breakfast'] || Object.values(catIdMap)[0];
-  const mealsId = catIdMap['Meals & Biryani'] || Object.values(catIdMap)[0];
-  const fastFoodId = catIdMap['Fast Food & Burgers'] || Object.values(catIdMap)[0];
-  const snacksId = catIdMap['Snacks & Street Food'] || Object.values(catIdMap)[0];
-  const beverageId = catIdMap['Beverages & Chai'] || Object.values(catIdMap)[0];
-  const dessertId = catIdMap['Desserts'] || Object.values(catIdMap)[0];
-
-  const sampleFoodItems: Omit<FoodItem, 'id'>[] = [
-    {
-      name: 'Chicken Biryani',
-      description: 'Fragrant basmati rice cooked with tender marinated chicken pieces, whole spices, and served with raita.',
-      price: 150,
-      categoryId: mealsId,
-      categoryName: 'Meals & Biryani',
-      imageUrl: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=700&auto=format&fit=crop&q=80',
-      available: true,
-      isVeg: false,
-      preparationTime: 15,
-      rating: 4.8,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      name: 'Veg Dum Biryani',
-      description: 'Slow-cooked spiced aromatic rice layered with fresh cottage cheese (paneer), carrots, beans, and fried onions.',
-      price: 120,
-      categoryId: mealsId,
-      categoryName: 'Meals & Biryani',
-      imageUrl: 'https://images.unsplash.com/photo-1633945274405-b6c8069047b0?w=700&auto=format&fit=crop&q=80',
-      available: true,
-      isVeg: true,
-      preparationTime: 15,
-      rating: 4.6,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      name: 'Chicken Fried Rice',
-      description: 'Wok-tossed steamed rice with shredded seasoned chicken, spring onions, egg ribbons, and light soy sauce.',
-      price: 120,
-      categoryId: mealsId,
-      categoryName: 'Meals & Biryani',
-      imageUrl: 'https://images.unsplash.com/photo-1603133872878-684f208fb84b?w=700&auto=format&fit=crop&q=80',
-      available: true,
-      isVeg: false,
-      preparationTime: 12,
-      rating: 4.7,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      name: 'Veg Fried Rice',
-      description: 'Classic oriental wok rice loaded with crunchy bell peppers, cabbage, carrots, and roasted garlic aroma.',
-      price: 90,
-      categoryId: mealsId,
-      categoryName: 'Meals & Biryani',
-      imageUrl: 'https://images.unsplash.com/photo-1645177628172-a94c1f96e6db?w=700&auto=format&fit=crop&q=80',
-      available: true,
-      isVeg: true,
-      preparationTime: 10,
-      rating: 4.5,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      name: 'Crispy Chicken Burger',
-      description: 'Golden crumbed chicken patty with melted cheddar cheese slice, fresh lettuce, and smoky garlic mayo on toasted sesame bun.',
-      price: 110,
-      categoryId: fastFoodId,
-      categoryName: 'Fast Food & Burgers',
-      imageUrl: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=700&auto=format&fit=crop&q=80',
-      available: true,
-      isVeg: false,
-      preparationTime: 15,
-      rating: 4.9,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      name: 'Veggie Supreme Burger',
-      description: 'Herb-spiced potato & corn patty with pickled cucumber, tomatoes, sweet relish, and creamy chipotle sauce.',
-      price: 80,
-      categoryId: fastFoodId,
-      categoryName: 'Fast Food & Burgers',
-      imageUrl: 'https://images.unsplash.com/photo-1550547660-d9450f859349?w=700&auto=format&fit=crop&q=80',
-      available: true,
-      isVeg: true,
-      preparationTime: 12,
-      rating: 4.4,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      name: 'Grilled Cheese Sandwich',
-      description: 'Triple layered sandwich loaded with grated mozzarella, spiced mint chutney, bell pepper cubes, and grilled crisp with butter.',
-      price: 70,
-      categoryId: fastFoodId,
-      categoryName: 'Fast Food & Burgers',
-      imageUrl: 'https://images.unsplash.com/photo-1528735602780-2552fd46c7af?w=700&auto=format&fit=crop&q=80',
-      available: true,
-      isVeg: true,
-      preparationTime: 10,
-      rating: 4.6,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      name: 'Peri-Peri French Fries',
-      description: 'Crispy straight cut skin-on potato fries tossed liberally in zesty African peri-peri spices.',
-      price: 60,
-      categoryId: fastFoodId,
-      categoryName: 'Fast Food & Burgers',
-      imageUrl: 'https://images.unsplash.com/photo-1576107232684-1279f3908594?w=700&auto=format&fit=crop&q=80',
-      available: true,
-      isVeg: true,
-      preparationTime: 8,
-      rating: 4.7,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      name: 'Crispy Punjabi Samosa (2 pcs)',
-      description: 'Flaky crust stuffed with spicy cumin potatoes and sweet green peas, served with sweet tamarind and spicy mint chutney.',
-      price: 35,
-      categoryId: snacksId,
-      categoryName: 'Snacks & Street Food',
-      imageUrl: 'https://images.unsplash.com/photo-1601050690597-df0568f70950?w=700&auto=format&fit=crop&q=80',
-      available: true,
-      isVeg: true,
-      preparationTime: 5,
-      rating: 4.8,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      name: 'Masala Dosa with Sambar',
-      description: 'Golden fermented rice-lentil crepe smeared with red chutney, filled with potato masala, served with piping hot coconut chutney and sambar.',
-      price: 65,
-      categoryId: breakfastId,
-      categoryName: 'Breakfast',
-      imageUrl: 'https://images.unsplash.com/photo-1589301760014-d929f3979dbc?w=700&auto=format&fit=crop&q=80',
-      available: true,
-      isVeg: true,
-      preparationTime: 12,
-      rating: 4.9,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      name: 'Special Kadak Masala Chai',
-      description: 'Slow-brewed Assam tea leaves infused with crushed ginger, cardamom pods, clove, and fresh creamy milk.',
-      price: 15,
-      categoryId: beverageId,
-      categoryName: 'Beverages & Chai',
-      imageUrl: 'https://images.unsplash.com/photo-1544787219-7f47ccb76574?w=700&auto=format&fit=crop&q=80',
-      available: true,
-      isVeg: true,
-      preparationTime: 5,
-      rating: 5.0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      name: 'South Indian Filter Coffee',
-      description: 'Traditional chicory blend decoction frothed with boiling whole milk, served in classic stainless steel tumbler style.',
-      price: 25,
-      categoryId: beverageId,
-      categoryName: 'Beverages & Chai',
-      imageUrl: 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=700&auto=format&fit=crop&q=80',
-      available: true,
-      isVeg: true,
-      preparationTime: 5,
-      rating: 4.8,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      name: 'Chilled Mango Lassi',
-      description: 'Thick creamy yoghurt churned with Alphonso mango pulp and a pinch of aromatic saffron and cardamom.',
-      price: 50,
-      categoryId: beverageId,
-      categoryName: 'Beverages & Chai',
-      imageUrl: 'https://images.unsplash.com/photo-1527661591475-527312dd65f5?w=700&auto=format&fit=crop&q=80',
-      available: true,
-      isVeg: true,
-      preparationTime: 5,
-      rating: 4.9,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      name: 'Fudgy Choco Brownie',
-      description: 'Decadent dark chocolate fudge brownie with gooey molten center and chopped roasted walnuts.',
-      price: 60,
-      categoryId: dessertId,
-      categoryName: 'Desserts',
-      imageUrl: 'https://images.unsplash.com/photo-1551024709-8f23befc6f87?w=700&auto=format&fit=crop&q=80',
-      available: true,
-      isVeg: true,
-      preparationTime: 3,
-      rating: 4.9,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-  ];
 
   const foodItemsCollection = collection(db, FOOD_ITEMS_COL);
   const existingFood = await getDocs(foodItemsCollection);
 
-  if (existingFood.empty) {
-    for (const item of sampleFoodItems) {
-      await addDoc(foodItemsCollection, item);
+  // If empty or fewer than 15 items, populate full menu
+  if (existingFood.size < 15) {
+    for (const item of INITIAL_FOOD_ITEMS) {
+      await setDoc(doc(db, FOOD_ITEMS_COL, item.id), {
+        ...item,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
     }
   }
 
@@ -670,14 +508,14 @@ export async function seedCanteenDemoData(): Promise<{ categoriesCount: number; 
     doc(db, SETTINGS_COL, DEFAULT_SETTINGS_DOC),
     {
       acceptingOrders: true,
-      announcement: 'College Canteen is OPEN! Order online and collect via token when notified.',
+      announcement: 'Campus Food Court is OPEN! Order online & pick up at the counter with your Order Token Number.',
       updatedAt: new Date().toISOString(),
     },
     { merge: true }
   );
 
   return {
-    categoriesCount: sampleCategories.length,
-    itemsCount: sampleFoodItems.length,
+    categoriesCount: INITIAL_CATEGORIES.length,
+    itemsCount: INITIAL_FOOD_ITEMS.length,
   };
 }

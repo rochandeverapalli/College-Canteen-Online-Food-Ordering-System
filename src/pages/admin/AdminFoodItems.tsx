@@ -165,20 +165,31 @@ export const AdminFoodItems: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white rounded-3xl border border-stone-200 p-6 shadow-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 glass-card rounded-3xl border border-purple-500/20 p-6 shadow-xl">
         <div>
-          <h1 className="text-2xl font-black text-stone-900 tracking-tight">
+          <h1 className="text-2xl font-black text-white tracking-tight">
             Canteen Menu Management
           </h1>
-          <p className="text-xs sm:text-sm text-stone-500">
-            Add food items, update prices, and toggle in-stock / out-of-stock live
+          <p className="text-xs sm:text-sm text-purple-300/80 mt-1">
+            Add items, configure pricing, and toggle live stock availability for the counter
           </p>
         </div>
 
         <div className="flex items-center gap-3">
+          {foodItems.length < 15 && (
+            <button
+              onClick={handleSeed}
+              disabled={seeding}
+              className="px-3.5 py-2 rounded-2xl bg-purple-900/60 hover:bg-purple-800 text-teal-300 border border-purple-500/30 text-xs font-semibold flex items-center gap-1.5 transition"
+            >
+              <Database className="w-3.5 h-3.5" />
+              <span>Load 26+ Items</span>
+            </button>
+          )}
+
           <button
             onClick={openAddModal}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-md transition"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-purple-600 to-teal-400 hover:from-purple-500 hover:to-teal-300 text-white font-bold text-xs shadow-lg shadow-purple-600/30 transition cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Add Food Item</span>
@@ -193,8 +204,8 @@ export const AdminFoodItems: React.FC = () => {
             onClick={() => setCategoryFilter('all')}
             className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition ${
               categoryFilter === 'all'
-                ? 'bg-stone-900 text-white'
-                : 'bg-white border border-stone-200 text-stone-600 hover:bg-stone-50'
+                ? 'bg-gradient-to-r from-purple-600 to-teal-400 text-white shadow-md'
+                : 'glass-card text-purple-300 hover:text-white'
             }`}
           >
             All Categories ({foodItems.length})
@@ -205,8 +216,8 @@ export const AdminFoodItems: React.FC = () => {
               onClick={() => setCategoryFilter(cat.id)}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition ${
                 categoryFilter === cat.id
-                  ? 'bg-stone-900 text-white'
-                  : 'bg-white border border-stone-200 text-stone-600 hover:bg-stone-50'
+                  ? 'bg-gradient-to-r from-purple-600 to-teal-400 text-white shadow-md'
+                  : 'glass-card text-purple-300 hover:text-white'
               }`}
             >
               {cat.name}
@@ -215,63 +226,63 @@ export const AdminFoodItems: React.FC = () => {
         </div>
 
         <div className="relative w-full sm:w-64">
-          <Search className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-purple-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             placeholder="Search items..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 text-xs bg-white border border-stone-200 rounded-xl focus:outline-none focus:border-amber-500"
+            className="w-full pl-9 pr-4 py-2 text-xs bg-purple-950/40 border border-purple-500/30 rounded-xl text-white placeholder-purple-300/40 focus:outline-none focus:border-teal-400"
           />
         </div>
       </div>
 
-      {/* Table / Grid */}
-      <div className="bg-white rounded-3xl border border-stone-200 shadow-sm overflow-hidden">
+      {/* Table */}
+      <div className="glass-card rounded-3xl border border-purple-500/20 shadow-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-stone-200 bg-stone-50/80 text-[11px] font-bold uppercase tracking-wider text-stone-500">
-                <th className="py-3 px-4">Item</th>
-                <th className="py-3 px-4">Category</th>
-                <th className="py-3 px-4">Price</th>
-                <th className="py-3 px-4">Prep Time</th>
-                <th className="py-3 px-4">Type</th>
-                <th className="py-3 px-4 text-center">Live Availability</th>
-                <th className="py-3 px-4 text-right">Actions</th>
+              <tr className="border-b border-purple-500/20 bg-purple-950/60 text-[11px] font-bold uppercase tracking-wider text-purple-300">
+                <th className="py-3.5 px-4">Item</th>
+                <th className="py-3.5 px-4">Category</th>
+                <th className="py-3.5 px-4">Price</th>
+                <th className="py-3.5 px-4">Prep Time</th>
+                <th className="py-3.5 px-4">Type</th>
+                <th className="py-3.5 px-4 text-center">Live Availability</th>
+                <th className="py-3.5 px-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-stone-100 text-xs">
+            <tbody className="divide-y divide-purple-500/10 text-xs">
               {filteredItems.map((item) => (
-                <tr key={item.id} className="hover:bg-stone-50/60 transition">
+                <tr key={item.id} className="hover:bg-purple-950/30 transition">
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-3">
                       <img
                         src={item.imageUrl || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=100&auto=format&fit=crop&q=80'}
                         alt={item.name}
                         referrerPolicy="no-referrer"
-                        className="w-10 h-10 rounded-xl object-cover shrink-0 bg-stone-100"
+                        className="w-10 h-10 rounded-xl object-cover shrink-0 bg-purple-950 border border-purple-500/30"
                       />
                       <div>
-                        <span className="font-bold text-stone-900 block">
+                        <span className="font-bold text-white block">
                           {item.name}
                         </span>
-                        <span className="text-[10px] text-stone-400 line-clamp-1 max-w-[180px]">
+                        <span className="text-[10px] text-purple-300/60 line-clamp-1 max-w-[180px]">
                           {item.description}
                         </span>
                       </div>
                     </div>
                   </td>
 
-                  <td className="py-3 px-4 font-semibold text-stone-700">
+                  <td className="py-3 px-4 font-semibold text-purple-200">
                     {item.categoryName || item.categoryId}
                   </td>
 
-                  <td className="py-3 px-4 font-black text-stone-900">
+                  <td className="py-3 px-4 font-black text-teal-300">
                     ₹{item.price}
                   </td>
 
-                  <td className="py-3 px-4 text-stone-600">
+                  <td className="py-3 px-4 text-purple-300">
                     ~{item.preparationTime || 10}m
                   </td>
 
@@ -279,16 +290,16 @@ export const AdminFoodItems: React.FC = () => {
                     <div className="flex items-center gap-1">
                       <div
                         className={`w-3.5 h-3.5 border flex items-center justify-center rounded-xs ${
-                          item.isVeg ? 'border-emerald-600' : 'border-rose-700'
+                          item.isVeg ? 'border-emerald-400' : 'border-rose-400'
                         }`}
                       >
                         <div
                           className={`w-2 h-2 rounded-full ${
-                            item.isVeg ? 'bg-emerald-600' : 'bg-rose-700'
+                            item.isVeg ? 'bg-emerald-400' : 'bg-rose-500'
                           }`}
                         />
                       </div>
-                      <span className="font-medium text-[11px] text-stone-700">
+                      <span className="font-medium text-[11px] text-purple-200">
                         {item.isVeg ? 'Veg' : 'Non-Veg'}
                       </span>
                     </div>
@@ -297,10 +308,10 @@ export const AdminFoodItems: React.FC = () => {
                   <td className="py-3 px-4 text-center">
                     <button
                       onClick={() => handleToggle(item.id, item.available)}
-                      className={`px-3 py-1 rounded-full text-[11px] font-bold transition shadow-2xs ${
+                      className={`px-3 py-1 rounded-full text-[11px] font-bold transition shadow-sm ${
                         item.available
-                          ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
-                          : 'bg-rose-100 text-rose-800 hover:bg-rose-200'
+                          ? 'bg-teal-400 text-slate-950 hover:bg-teal-300'
+                          : 'bg-rose-500/20 text-rose-300 border border-rose-500/30 hover:bg-rose-500/30'
                       }`}
                       title="Click to toggle in/out of stock"
                     >
@@ -312,14 +323,14 @@ export const AdminFoodItems: React.FC = () => {
                     <div className="flex items-center justify-end gap-1.5">
                       <button
                         onClick={() => openEditModal(item)}
-                        className="p-1.5 rounded-lg text-stone-500 hover:text-stone-900 hover:bg-stone-100 transition"
+                        className="p-1.5 rounded-lg text-purple-300 hover:text-white hover:bg-purple-900/50 transition"
                         title="Edit Item"
                       >
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => handleDelete(item.id, item.name)}
-                        className="p-1.5 rounded-lg text-stone-400 hover:text-rose-600 hover:bg-rose-50 transition"
+                        className="p-1.5 rounded-lg text-purple-400 hover:text-rose-400 hover:bg-rose-950/40 transition"
                         title="Delete Item"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -333,7 +344,7 @@ export const AdminFoodItems: React.FC = () => {
         </div>
 
         {filteredItems.length === 0 && !loading && (
-          <div className="py-12 text-center text-stone-400 text-xs">
+          <div className="py-12 text-center text-purple-300/60 text-xs">
             No items match this category or search query.
           </div>
         )}
@@ -341,18 +352,18 @@ export const AdminFoodItems: React.FC = () => {
 
       {/* Add / Edit Food Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-stone-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div
-            className="bg-white rounded-3xl p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto space-y-4 shadow-2xl animate-in fade-in zoom-in-95 duration-150"
+            className="glass-card rounded-3xl p-6 max-w-lg w-full max-h-[90vh] overflow-y-auto space-y-4 shadow-2xl border border-purple-500/30"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-stone-100 pb-3">
-              <h3 className="text-base font-bold text-stone-900">
+            <div className="flex items-center justify-between border-b border-purple-500/20 pb-3">
+              <h3 className="text-base font-bold text-white">
                 {editingItem ? 'Edit Canteen Food Item' : 'Add New Food Item'}
               </h3>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="p-1 rounded-full text-stone-400 hover:text-stone-700"
+                className="p-1 rounded-full text-purple-300 hover:text-white"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -360,7 +371,7 @@ export const AdminFoodItems: React.FC = () => {
 
             <form onSubmit={handleSave} className="space-y-3.5">
               <div>
-                <label className="text-xs font-bold text-stone-700 block mb-1">
+                <label className="text-xs font-bold text-purple-200 block mb-1">
                   Food Item Name
                 </label>
                 <input
@@ -369,19 +380,19 @@ export const AdminFoodItems: React.FC = () => {
                   placeholder="e.g. Masala Dosa with Chutney"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full text-xs px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:border-amber-500"
+                  className="w-full text-xs px-3 py-2 bg-purple-950/40 border border-purple-500/30 rounded-xl text-white outline-none focus:border-teal-400"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-bold text-stone-700 block mb-1">
+                  <label className="text-xs font-bold text-purple-200 block mb-1">
                     Category
                   </label>
                   <select
                     value={categoryId}
                     onChange={(e) => setCategoryId(e.target.value)}
-                    className="w-full text-xs px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:border-amber-500"
+                    className="w-full text-xs px-3 py-2 bg-purple-950/60 border border-purple-500/30 rounded-xl text-white outline-none"
                   >
                     {categories.map((c) => (
                       <option key={c.id} value={c.id}>
@@ -392,7 +403,7 @@ export const AdminFoodItems: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold text-stone-700 block mb-1">
+                  <label className="text-xs font-bold text-purple-200 block mb-1">
                     Price (₹)
                   </label>
                   <input
@@ -401,27 +412,27 @@ export const AdminFoodItems: React.FC = () => {
                     min={1}
                     value={price}
                     onChange={(e) => setPrice(Number(e.target.value))}
-                    className="w-full text-xs px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:border-amber-500"
+                    className="w-full text-xs px-3 py-2 bg-purple-950/40 border border-purple-500/30 rounded-xl text-white outline-none focus:border-teal-400"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-bold text-stone-700 block mb-1">
-                    Preparation Time (Minutes)
+                  <label className="text-xs font-bold text-purple-200 block mb-1">
+                    Prep Time (Minutes)
                   </label>
                   <input
                     type="number"
                     min={1}
                     value={preparationTime}
                     onChange={(e) => setPreparationTime(Number(e.target.value))}
-                    className="w-full text-xs px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:border-amber-500"
+                    className="w-full text-xs px-3 py-2 bg-purple-950/40 border border-purple-500/30 rounded-xl text-white outline-none focus:border-teal-400"
                   />
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold text-stone-700 block mb-1">
+                  <label className="text-xs font-bold text-purple-200 block mb-1">
                     Dietary Classification
                   </label>
                   <div className="flex items-center gap-2 pt-1">
@@ -430,8 +441,8 @@ export const AdminFoodItems: React.FC = () => {
                       onClick={() => setIsVeg(true)}
                       className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition ${
                         isVeg
-                          ? 'bg-emerald-50 border-emerald-500 text-emerald-800'
-                          : 'bg-white border-stone-200 text-stone-500'
+                          ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300'
+                          : 'bg-purple-950/40 border-purple-500/20 text-purple-400'
                       }`}
                     >
                       Pure Veg
@@ -441,8 +452,8 @@ export const AdminFoodItems: React.FC = () => {
                       onClick={() => setIsVeg(false)}
                       className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition ${
                         !isVeg
-                          ? 'bg-rose-50 border-rose-500 text-rose-800'
-                          : 'bg-white border-stone-200 text-stone-500'
+                          ? 'bg-rose-500/20 border-rose-400 text-rose-300'
+                          : 'bg-purple-950/40 border-purple-500/20 text-purple-400'
                       }`}
                     >
                       Non-Veg
@@ -452,7 +463,7 @@ export const AdminFoodItems: React.FC = () => {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-stone-700 block mb-1">
+                <label className="text-xs font-bold text-purple-200 block mb-1">
                   Image URL
                 </label>
                 <input
@@ -460,12 +471,12 @@ export const AdminFoodItems: React.FC = () => {
                   placeholder="https://images.unsplash.com/..."
                   value={imageUrl}
                   onChange={(e) => setImageUrl(e.target.value)}
-                  className="w-full text-xs px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:border-amber-500"
+                  className="w-full text-xs px-3 py-2 bg-purple-950/40 border border-purple-500/30 rounded-xl text-white outline-none focus:border-teal-400"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-bold text-stone-700 block mb-1">
+                <label className="text-xs font-bold text-purple-200 block mb-1">
                   Description
                 </label>
                 <textarea
@@ -473,7 +484,7 @@ export const AdminFoodItems: React.FC = () => {
                   placeholder="Crispy crepe made from fermented batter, served with coconut chutney & sambar."
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="w-full text-xs px-3 py-2 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:border-amber-500"
+                  className="w-full text-xs px-3 py-2 bg-purple-950/40 border border-purple-500/30 rounded-xl text-white outline-none focus:border-teal-400"
                 />
               </div>
 
@@ -483,25 +494,25 @@ export const AdminFoodItems: React.FC = () => {
                   id="availCheck"
                   checked={available}
                   onChange={(e) => setAvailable(e.target.checked)}
-                  className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-stone-300"
+                  className="w-4 h-4 rounded text-teal-400 focus:ring-teal-400 border-purple-500/30 accent-teal-400"
                 />
-                <label htmlFor="availCheck" className="text-xs font-semibold text-stone-700 cursor-pointer">
+                <label htmlFor="availCheck" className="text-xs font-semibold text-purple-200 cursor-pointer">
                   Available in Canteen Stock Today
                 </label>
               </div>
 
-              <div className="pt-2 flex items-center justify-end gap-2 border-t border-stone-100">
+              <div className="pt-2 flex items-center justify-end gap-2 border-t border-purple-500/20">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 font-semibold text-xs transition"
+                  className="px-4 py-2 rounded-xl bg-purple-950/40 hover:bg-purple-900/50 text-purple-300 font-semibold text-xs transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-md transition flex items-center gap-2"
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-teal-400 hover:from-purple-500 text-white font-bold text-xs shadow-md transition flex items-center gap-2"
                 >
                   {isSubmitting ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />

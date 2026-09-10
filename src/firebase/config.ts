@@ -15,12 +15,12 @@ const firebaseConfig = {
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// CRITICAL: Initialize Firestore with firestoreDatabaseId
 const firestoreDbId =
   import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID ||
   appletConfig.firestoreDatabaseId ||
   '(default)';
 
+// Critical: Use getFirestore with firestoreDatabaseId as required by Firebase skill
 export const db = getFirestore(app, firestoreDbId);
 export const auth = getAuth(app);
 export const storage = getStorage(app);
@@ -29,12 +29,17 @@ export const storage = getStorage(app);
 export async function testFirestoreConnection(): Promise<boolean> {
   try {
     await getDocFromServer(doc(db, 'test', 'connection'));
+    console.log('Firestore connection verified.');
     return true;
   } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.warn('Firebase client is offline or network is limited.');
+    if (
+      error instanceof Error &&
+      (error.message.includes('the client is offline') ||
+        error.message.includes('unavailable') ||
+        error.message.includes('could not be completed'))
+    ) {
+      console.warn('Firebase client is offline or network is limited. Operating in cached mode.');
     } else {
-      // Normal if document does not exist, connection is alive
       console.log('Firestore connection verified.');
     }
     return true;

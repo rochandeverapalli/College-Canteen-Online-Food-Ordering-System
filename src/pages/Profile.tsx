@@ -1,9 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   User,
   Hash,
-  Mail,
   Phone,
   ShieldCheck,
   Key,
@@ -13,6 +12,7 @@ import {
   LayoutDashboard,
   Save,
   Loader2,
+  Sparkles,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { updateUserProfile } from '../firebase/auth';
@@ -31,6 +31,14 @@ export const Profile: React.FC = () => {
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [claimMessage, setClaimMessage] = useState<{ text: string; isError?: boolean } | null>(null);
 
+  useEffect(() => {
+    if (userProfile) {
+      setName(userProfile.name);
+      setRollNumber(userProfile.rollNumber);
+      setPhone(userProfile.phone);
+    }
+  }, [userProfile]);
+
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentUser) return;
@@ -39,9 +47,9 @@ export const Profile: React.FC = () => {
 
     try {
       await updateUserProfile(currentUser.uid, {
-        name,
-        rollNumber,
-        phone,
+        name: name.trim(),
+        rollNumber: rollNumber.trim().toUpperCase(),
+        phone: phone.trim(),
       });
       await refreshProfile();
       setSaveMessage('Profile information saved successfully.');
@@ -52,25 +60,26 @@ export const Profile: React.FC = () => {
     }
   };
 
-  const handleClaimAdmin = async () => {
-    if (!passkey.trim()) return;
+  const handleClaimAdmin = async (forcedKey?: string) => {
+    const keyToUse = forcedKey || passkey.trim();
+    if (!keyToUse) return;
     setClaimLoading(true);
     setClaimMessage(null);
 
     try {
-      const ok = await claimAdmin(passkey.trim());
+      const ok = await claimAdmin(keyToUse);
       if (ok) {
-        setClaimMessage({ text: 'Admin privileges granted! You now have staff access.' });
+        setClaimMessage({ text: 'Staff Administrator privileges activated!' });
         setPasskey('');
       } else {
         setClaimMessage({
-          text: 'Invalid passkey. Hint: default test passkey is "canteenadmin2025"',
+          text: 'Invalid passkey. Use CANTEEN_STAFF_2025.',
           isError: true,
         });
       }
     } catch (err: unknown) {
       setClaimMessage({
-        text: err instanceof Error ? err.message : 'Error claiming admin access.',
+        text: err instanceof Error ? err.message : 'Error claiming staff access.',
         isError: true,
       });
     } finally {
@@ -91,19 +100,25 @@ export const Profile: React.FC = () => {
               <h1 className="text-xl sm:text-2xl font-black text-stone-900 tracking-tight">
                 {name || 'College Student'}
               </h1>
-              {isAdmin && (
-                <span className="bg-amber-100 text-amber-800 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full flex items-center gap-1 border border-amber-200">
-                  <ShieldCheck className="w-3 h-3" />
+              {isAdmin ? (
+                <span className="bg-amber-100 text-amber-800 text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full flex items-center gap-1 border border-amber-200">
+                  <ShieldCheck className="w-3 h-3 text-amber-600" />
                   Staff Admin
+                </span>
+              ) : (
+                <span className="bg-stone-100 text-stone-700 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border border-stone-200">
+                  Student
                 </span>
               )}
             </div>
-            <p className="text-xs text-stone-500 mt-0.5">{currentUser?.email}</p>
-            {rollNumber && (
-              <span className="inline-block mt-1 font-mono text-xs font-bold text-stone-700 bg-stone-100 px-2 py-0.5 rounded-md">
-                Roll: {rollNumber}
+            <div className="flex items-center gap-2 mt-1 justify-center sm:justify-start">
+              <span className="font-mono text-xs font-bold text-stone-700 bg-stone-100 px-2 py-0.5 rounded-md">
+                Roll: {rollNumber || 'N/A'}
               </span>
-            )}
+              <span className="text-xs text-stone-500">
+                • Mobile: {phone || 'N/A'}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -114,11 +129,14 @@ export const Profile: React.FC = () => {
               className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-sm transition flex items-center gap-1.5"
             >
               <LayoutDashboard className="w-3.5 h-3.5" />
-              <span>Admin Portal</span>
+              <span>Kitchen Portal</span>
             </Link>
           )}
           <button
-            onClick={logout}
+            onClick={() => {
+              logout();
+              navigate('/');
+            }}
             className="px-4 py-2 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-bold transition flex items-center gap-1.5"
           >
             <LogOut className="w-3.5 h-3.5" />
@@ -131,7 +149,7 @@ export const Profile: React.FC = () => {
       <div className="bg-white rounded-3xl border border-stone-200 p-6 sm:p-8 shadow-sm space-y-6">
         <h3 className="text-base font-bold text-stone-900 border-b border-stone-100 pb-3 flex items-center gap-2">
           <User className="w-4 h-4 text-amber-500" />
-          <span>Edit Profile Details</span>
+          <span>Profile Details</span>
         </h3>
 
         {saveMessage && (
@@ -158,7 +176,7 @@ export const Profile: React.FC = () => {
 
             <div>
               <label className="text-xs font-bold text-stone-700 block mb-1">
-                Roll Number / Student ID
+                Roll Number / Staff ID
               </label>
               <input
                 type="text"
@@ -171,26 +189,27 @@ export const Profile: React.FC = () => {
 
             <div>
               <label className="text-xs font-bold text-stone-700 block mb-1">
-                Phone Number
+                Mobile Number
               </label>
               <input
                 type="tel"
+                required
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder="+91 9876543210"
+                placeholder="e.g. 9812345678"
                 className="w-full text-xs px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-2xl focus:bg-white focus:outline-none focus:border-amber-500"
               />
             </div>
 
             <div>
               <label className="text-xs font-bold text-stone-700 block mb-1">
-                Email (Account Primary)
+                Assigned Role
               </label>
               <input
-                type="email"
+                type="text"
                 disabled
-                value={currentUser?.email || ''}
-                className="w-full text-xs px-3.5 py-2.5 bg-stone-100 border border-stone-200 rounded-2xl text-stone-500 cursor-not-allowed"
+                value={isAdmin ? 'Canteen Staff / Admin' : 'College Student'}
+                className="w-full text-xs px-3.5 py-2.5 bg-stone-100 border border-stone-200 rounded-2xl text-stone-600 font-semibold cursor-not-allowed"
               />
             </div>
           </div>
@@ -205,7 +224,7 @@ export const Profile: React.FC = () => {
             ) : (
               <Save className="w-3.5 h-3.5" />
             )}
-            <span>Save Profile</span>
+            <span>Save Profile Changes</span>
           </button>
         </form>
       </div>
@@ -215,10 +234,10 @@ export const Profile: React.FC = () => {
         <div className="bg-amber-50/70 border border-amber-200 rounded-3xl p-6 shadow-sm space-y-3">
           <div className="flex items-center gap-2 text-amber-900 font-bold text-sm">
             <Key className="w-4 h-4 text-amber-600" />
-            <span>Are you a Canteen Staff Member?</span>
+            <span>Canteen Staff Access Portal</span>
           </div>
           <p className="text-xs text-amber-800 leading-relaxed">
-            Enter the canteen management passkey to activate Staff Administrator permissions on your account. (Hint for evaluation: passkey is <code className="bg-amber-200/80 px-1.5 py-0.5 rounded font-mono font-bold">canteenadmin2025</code>).
+            Enter the canteen staff access passkey to activate Staff Administrator permissions on your account, or click the 1-click test button below:
           </p>
 
           {claimMessage && (
@@ -238,20 +257,28 @@ export const Profile: React.FC = () => {
             </div>
           )}
 
-          <div className="flex items-center gap-2 pt-1 max-w-md">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
             <input
               type="password"
-              placeholder="Enter admin passkey..."
+              placeholder="Enter CANTEEN_STAFF_2025"
               value={passkey}
               onChange={(e) => setPasskey(e.target.value)}
-              className="flex-1 text-xs px-3.5 py-2.5 bg-white border border-amber-300 rounded-2xl focus:outline-none focus:border-amber-600"
+              className="flex-1 text-xs px-3.5 py-2.5 bg-white border border-amber-300 rounded-2xl focus:outline-none focus:border-amber-600 font-mono"
             />
             <button
-              onClick={handleClaimAdmin}
+              onClick={() => handleClaimAdmin()}
               disabled={claimLoading || !passkey.trim()}
-              className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl text-xs font-bold transition disabled:opacity-50"
+              className="px-4 py-2.5 bg-stone-900 hover:bg-stone-800 text-white rounded-2xl text-xs font-bold transition disabled:opacity-50"
             >
               {claimLoading ? 'Verifying...' : 'Activate Staff'}
+            </button>
+            <button
+              onClick={() => handleClaimAdmin('CANTEEN_STAFF_2025')}
+              disabled={claimLoading}
+              className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>1-Click Test Admin</span>
             </button>
           </div>
         </div>
