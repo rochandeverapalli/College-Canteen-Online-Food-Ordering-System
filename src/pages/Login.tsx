@@ -33,7 +33,20 @@ export const Login: React.FC = () => {
       await login(email, password);
       navigate(from, { replace: true });
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Invalid credentials. Please try again.');
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg.includes('auth/operation-not-allowed')) {
+        setError(
+          'Email/Password sign-in is disabled in your Firebase console. Please click "Continue with Google Account" above, or enable Email/Password provider in Firebase Console > Authentication > Sign-in method.'
+        );
+      } else if (
+        msg.includes('auth/invalid-credential') ||
+        msg.includes('auth/user-not-found') ||
+        msg.includes('auth/wrong-password')
+      ) {
+        setError('Invalid email or password. You can sign in with Google above or register below.');
+      } else {
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }
